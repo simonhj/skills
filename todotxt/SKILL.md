@@ -54,6 +54,14 @@ Specifically:
 
 **NEVER edit the todo.txt file by hand.** Only use the `todo.sh` command. This preserves line-number stability, prevents corruption of the plain-text format, and ensures the tool's internal tracking remains consistent.
 
+## Prefer a subagent for reads
+
+When this skill is invoked from the main session (e.g., via `/todotxt`), consider spawning a subagent (general-purpose or Explore) to run `todo.sh` and return a concise summary. This is especially worthwhile for read-heavy operations — `list`, `listall`, `listpri`, `lsp`, `listcon`, `listproj`, `report` — whose output can dump dozens of unrelated task lines into the main session and bloat context that should stay focused on the active work.
+
+For small writes with tiny output (`add`, `do NR`, `pri NR X`, `depri NR`, `replace NR ...`), running inline in the main session is fine — the result is one or two lines.
+
+Use judgment: a single `todo.sh ls @phone` that's expected to return a couple of lines doesn't need a subagent; a `todo.sh listall` on a long-lived list does.
+
 ## Common Commands
 
 ### Adding tasks
@@ -140,13 +148,21 @@ todo.sh add "Review pull request +Work @computer agent_added:t agent:opencode se
 
 ### Detecting the session ID
 
-| Agent | Known env var | Fallback if env var is missing |
-|-------|--------------|--------------------------------|
-| **opencode** | `OPENCODE_RUN_ID` | Use value of `OPENCODE_RUN_ID` (verified). If missing, use `OPENCODE_PID` or omit `session:` tag. |
-| **claude** (Claude Code) | `CLAUDE_CODE_SESSION_ID` | Use value of `CLAUDE_CODE_SESSION_ID`. If missing, inspect `env` for any other `CLAUDE_*` variable that looks like a UUID/run ID. If none is found, omit the `session:` tag rather than invent a value. |
-| **codex** (OpenAI Codex CLI) | `CODEX_THREAD_ID` | Use value of `CODEX_THREAD_ID`. If missing, inspect `env` for any other `CODEX_*` variable that looks like a UUID/run ID. If none is found, omit the `session:` tag rather than invent a value. |
+The session ID is already in the environment when this skill is loaded. **Read the appropriate env var directly** — don't waste a turn running `env | grep`. The cleanest pattern is to expand the variable inline in the `todo.sh add` command itself, e.g.:
 
-**General rule:** Before adding a task, run `env | grep -iE '(opencode|claude|codex|cursor|pi)'` and pick the variable that most clearly represents the current run/session ID. If no such variable exists, omit `session:` but still include `agent_added:t` and `agent:<name>`.
+```bash
+todo.sh add "Review pull request +Work @computer agent_added:t agent:claude session:$CLAUDE_CODE_SESSION_ID"
+```
+
+If you want to confirm the value first, a single `echo "$CLAUDE_CODE_SESSION_ID"` (or the equivalent for your agent) is enough.
+
+| Agent | Use this env var directly | If empty/unset |
+|-------|---------------------------|----------------|
+| **claude** (Claude Code) | `$CLAUDE_CODE_SESSION_ID` | Check other `CLAUDE_*` vars that look like a UUID/run ID. If none, omit the `session:` tag. |
+| **opencode** | `$OPENCODE_RUN_ID` | Fall back to `$OPENCODE_PID`, otherwise omit the `session:` tag. |
+| **codex** (OpenAI Codex CLI) | `$CODEX_THREAD_ID` | Check other `CODEX_*` vars that look like a UUID/run ID. If none, omit the `session:` tag. |
+
+**Last-resort fallback only:** if you genuinely don't know which agent you're running as, `env | grep -iE '(opencode|claude|codex|cursor|pi)'` can be used to discover the right variable. Don't run this as the default workflow — pick the var from the table above. If no suitable variable exists, omit `session:` but still include `agent_added:t` and `agent:<name>`.
 
 ## Configuration
 
