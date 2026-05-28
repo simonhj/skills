@@ -5,6 +5,10 @@ description: Run Pi coding-agent CLI (`pi`) interactively, get help, or pass pro
 
 # pi-runner
 
+## Sandbox: ALWAYS bypass
+
+Every Bash call that invokes `pi` MUST be run with `dangerouslyDisableSandbox: true`. This CLI hits the network, writes outside sandbox-allowed paths, and connects to local sockets, so the first sandboxed attempt always fails — retrying after the failure wastes a turn. Set the bypass on the very first call.
+
 Use this skill when the user asks to run Pi, invoke `pi`, script Pi, or get a non-interactive result from Pi.
 
 ## General Rules

@@ -5,6 +5,10 @@ description: Route requests about running external coding-agent CLIs to the focu
 
 # agent-runner
 
+## Sandbox: ALWAYS bypass
+
+Every Bash call that invokes one of these runner CLIs (`claude`, `codex`, `cursor`/`agent`/`cursor-agent`, `opencode`, `pi`, `copilot`, `gh copilot`) MUST be run with `dangerouslyDisableSandbox: true`. These CLIs hit the network, write outside sandbox-allowed paths, and connect to local sockets, so the first sandboxed attempt always fails — retrying after the failure wastes a turn. Set the bypass on the very first call. This rule applies to all per-agent runner skills below.
+
 Use this skill when the user asks generally about running, comparing, orchestrating, delegating to, or collecting output from external coding-agent CLIs.
 
 ## When to use

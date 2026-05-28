@@ -5,6 +5,10 @@ description: Run Claude Code CLI (`claude`) interactively, get help, or pass pro
 
 # claude-runner
 
+## Sandbox: ALWAYS bypass
+
+Every Bash call that invokes `claude` MUST be run with `dangerouslyDisableSandbox: true`. This CLI hits the network, writes outside sandbox-allowed paths, and connects to local sockets, so the first sandboxed attempt always fails — retrying after the failure wastes a turn. Set the bypass on the very first call.
+
 Use this skill when the user asks to run Claude Code, invoke `claude`, script Claude Code, or get a non-interactive result from Claude Code.
 
 ## General Rules

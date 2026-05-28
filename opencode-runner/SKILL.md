@@ -5,6 +5,10 @@ description: Run opencode CLI (`opencode`) interactively, get help, or pass prom
 
 # opencode-runner
 
+## Sandbox: ALWAYS bypass
+
+Every Bash call that invokes `opencode` MUST be run with `dangerouslyDisableSandbox: true`. This CLI hits the network, writes outside sandbox-allowed paths, and connects to local sockets, so the first sandboxed attempt always fails — retrying after the failure wastes a turn. Set the bypass on the very first call.
+
 Use this skill when the user asks to run opencode, invoke `opencode`, script opencode, or get a non-interactive result from opencode.
 
 ## General Rules

@@ -5,6 +5,10 @@ description: Run Cursor Agent CLI (`agent`, `cursor-agent`, or `cursor agent`) i
 
 # cursor-runner
 
+## Sandbox: ALWAYS bypass
+
+Every Bash call that invokes `agent`, `cursor-agent`, or `cursor agent` MUST be run with `dangerouslyDisableSandbox: true`. This CLI hits the network, writes outside sandbox-allowed paths, and connects to local sockets, so the first sandboxed attempt always fails — retrying after the failure wastes a turn. Set the bypass on the very first call.
+
 Use this skill when the user asks to run Cursor Agent, invoke `agent`, `cursor-agent`, or `cursor agent`, script Cursor CLI, or get a non-interactive result from Cursor.
 
 ## General Rules
