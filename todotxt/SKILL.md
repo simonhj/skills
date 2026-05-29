@@ -161,6 +161,7 @@ If you want to confirm the value first, a single `echo "$CLAUDE_CODE_SESSION_ID"
 | **claude** (Claude Code) | `$CLAUDE_CODE_SESSION_ID` | Check other `CLAUDE_*` vars that look like a UUID/run ID. If none, omit the `session:` tag. |
 | **opencode** | `$OPENCODE_RUN_ID` | Fall back to `$OPENCODE_PID`, otherwise omit the `session:` tag. |
 | **codex** (OpenAI Codex CLI) | `$CODEX_THREAD_ID` | Check other `CODEX_*` vars that look like a UUID/run ID. If none, omit the `session:` tag. |
+| **cursor** (Cursor Agent CLI) | _(none — Cursor does not expose the conversation ID via env vars; it only pipes it to hooks via STDIN. Tracked as a [feature request](https://forum.cursor.com/t/cursor-conversation-id-through-environment-variables/160346).)_ | Omit the `session:` tag. Still include `agent_added:t` and `agent:cursor`. |
 
 **Last-resort fallback only:** if you genuinely don't know which agent you're running as, `env | grep -iE '(opencode|claude|codex|cursor|pi)'` can be used to discover the right variable. Don't run this as the default workflow — pick the var from the table above. If no suitable variable exists, omit `session:` but still include `agent_added:t` and `agent:<name>`.
 
