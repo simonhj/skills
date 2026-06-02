@@ -42,14 +42,34 @@ This skill is intentionally **GSD-agnostic**: it works on any repo, has no depen
 - a free-text description in quotes → treated as the plan to review (host writes it to the scratch dir first).
 
 **Options:**
-| Flag | Default | Meaning |
-|---|---|---|
-| `--reviewer <name>` | auto (cross-vendor) | Force the reviewer CLI: `codex`, `cursor`, `opencode`, `copilot`, `pi`, `claude`. |
-| `--panel [a,b,c]` | off (single) | Run a multi-reviewer panel each round instead of one reviewer. With no list, picks up to 3 available non-host CLIs. |
-| `--max-rounds N` | `3` | Hard cap on review rounds. |
-| `--only-blockers` | off | Gate convergence on **blockers only**; high/medium are reported but never keep the loop running. (Default gate is **blockers + high**.) |
-| `--auto` | off | Fully autonomous: never pause to ask the user. Disputed blockers are rejected with a recorded rebuttal and the loop continues. (Default: pause and ask the user to rule on any disputed **blocker**.) |
-| `--scratch <dir>` | `/tmp/cross-agent-review/<slug>/` | Where round artifacts are written (outside the repo by default, so nothing needs git-ignoring). |
+
+```xml
+<options>
+  <option flag="--reviewer &lt;name&gt;" default="auto (cross-vendor)">
+    Force the reviewer CLI: codex, cursor, opencode, copilot, pi, claude.
+  </option>
+  <option flag="--panel [a,b,c]" default="off (single)">
+    Run a multi-reviewer panel each round instead of one reviewer.
+    With no list, picks up to 3 available non-host CLIs.
+  </option>
+  <option flag="--max-rounds N" default="3">
+    Hard cap on review rounds.
+  </option>
+  <option flag="--only-blockers" default="off">
+    Gate convergence on blockers only; high/medium are reported but
+    never keep the loop running. Default gate is blockers + high.
+  </option>
+  <option flag="--auto" default="off">
+    Fully autonomous: never pause to ask the user. Disputed blockers
+    are rejected with a recorded rebuttal and the loop continues.
+    Default: pause and ask the user to rule on any disputed blocker.
+  </option>
+  <option flag="--scratch &lt;dir&gt;" default="/tmp/cross-agent-review/&lt;slug&gt;/">
+    Where round artifacts are written (outside the repo by default,
+    so nothing pollutes the working tree or needs git-ignoring).
+  </option>
+</options>
+```
 
 ## Step 0 — Set up
 
@@ -138,12 +158,52 @@ For each **NEW / UNRESOLVED / PARTIAL** finding, you (the host) decide — this 
 - Never ask the reviewer to "confirm these fixes are good." Always re-review adversarially against the current target ("verify each, find what's still broken") — reviewers asked to confirm agree even when wrong (arXiv:2510.11822). The re-review round *is* the verification.
 - Reject findings on their merits, not because they're inconvenient — the different-model reviewer is your defense against your own blind spots.
 
-Append every decision to `ledger.md`: round, finding id, severity, decision (APPLY/REJECT/ESCALATED→ruling), and the fix summary or rebuttal.
+Append every decision to `ledger.md` as an XML `<entry>`:
+
+```xml
+<ledger>
+  <entry round="1" id="F-001" severity="BLOCKER" decision="APPLY">
+    <fix>Refactored auth check to use constant-time comparison</fix>
+  </entry>
+  <entry round="1" id="F-002" severity="HIGH" decision="REJECT">
+    <rebuttal>Already handled by retry loop in line 147</rebuttal>
+  </entry>
+  <entry round="2" id="F-003" severity="BLOCKER" decision="ESCALATED" ruling="OVERRIDE-APPLY">
+    <fix>Added null-guard before dereference per user ruling</fix>
+  </entry>
+</ledger>
+```
+
+Fields:
+- `round` — review round number
+- `id` — finding identifier from the reviewer
+- `severity` — BLOCKER / HIGH / MEDIUM
+- `decision` — APPLY / REJECT / ESCALATED
+- `fix` — one-line summary of the applied change (APPLY or ESCALATED→OVERRIDE-APPLY)
+- `rebuttal` — concise reason for rejection (REJECT or ESCALATED→OVERRIDE-REJECT)
+- `ruling` — only for ESCALATED entries, records the final outcome
 
 ## Step 3 — Carry context forward
 
 Keep the context passed to the next round **compact** (a Reflexion-style buffer, not the full transcript — bounds cost and avoids context bloat). Carry only:
-1. **Pending finding records** — for each finding the host acted on, a compact record: `id`, `severity`, `location`, the original `claim`, the host action (APPLY/REJECT), and the one-line fix summary or rebuttal. Carrying the original claim + location (not just "what changed") lets the reviewer verify against the *defect* itself, not the host's description of its fix. Present rebuttals neutrally (see anti-sycophancy above). Drop a record once the reviewer marks it RESOLVED or CONCEDED.
+1. **Pending finding records** — for each finding the host acted on, carry a compact `<finding>` element in XML. This preserves the original claim + location so the reviewer verifies against the *defect* itself, not the host's description of its fix. Present rebuttals neutrally (see anti-sycophancy above). Drop a record once the reviewer marks it RESOLVED or CONCEDED.
+
+   ```xml
+   <carried-context>
+     <finding id="F-001" severity="BLOCKER" status="PENDING">
+       <location>src/auth.ts:42</location>
+       <claim>Timing side-channel in password comparison</claim>
+       <host-action>APPLY</host-action>
+       <fix>Refactored auth check to use constant-time comparison</fix>
+     </finding>
+     <finding id="F-002" severity="HIGH" status="PENDING">
+       <location>src/retry.ts:88</location>
+       <claim>Missing exponential backoff cap</claim>
+       <host-action>REJECT</host-action>
+       <rebuttal>Already handled by retry loop in line 147</rebuttal>
+     </finding>
+   </carried-context>
+   ```
 2. The **current** target state (re-capture the diff for code targets; the reviewer reads the current files itself).
 
 Do **not** carry resolved findings or the reviewer's full prose from prior rounds.
