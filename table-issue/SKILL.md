@@ -1,7 +1,7 @@
 ---
 name: table-issue
 description: >
-  Formally capture an issue: persist full context to a dated file in ~/ai-plans/,
+  Formally capture an issue: persist full context to a dated file in ~/ai-plans/todos/,
   create a todo.txt entry that references the plan file, and return the
   reference so the issue is traceable and resumable. Codifies the
   cargo-version-contamination workflow.
@@ -9,8 +9,9 @@ description: >
 
 # table-issue
 
-Capture an issue formally: write the full context to a file under `~/ai-plans/`,
-file a reference todo, and give the user a permalink they can resume from later.
+Capture an issue formally: write the full context to a file under
+`~/ai-plans/todos/`, file a reference todo, and give the user a permalink they
+can resume from later.
 
 ## When to use
 
@@ -41,7 +42,7 @@ If omitted, derive one from the first sentence of the issue description.
 | `--context <tag>` | inferred from issue type or `@investigation` | Context tag for the todo (`@context`). |
 | `--priority [A-Z]` | none | Optional todo priority, e.g. `--priority A`. |
 | `--due YYYY-MM-DD` | none | Optional due date, added as `due:YYYY-MM-DD`. |
-| `--plan-dir <path>` | `~/ai-plans/` | Directory to write the plan file. |
+| `--plan-dir <path>` | `~/ai-plans/todos/` | Directory to write the plan file. |
 | `--todo-file <path>` | `~/todo.txt` | Central todo.txt to append to. |
 | `--edit` | off | After writing, open the plan file for the user to edit before filing the todo. |
 
@@ -60,7 +61,7 @@ If omitted, derive one from the first sentence of the issue description.
    working repo name (e.g. `+socket-cli`) and the issue category (e.g.
    `@bug`, `@investigation`, `@incident`).
 
-### Step 2 — Persist to ~/ai-plans/
+### Step 2 — Persist to ~/ai-plans/todos/
 
 Create a file at `<plan-dir>/<YYYY-MM-DD>-<title>.md` with this structure:
 
@@ -102,7 +103,7 @@ close it before continuing.
 Add a todo to the central `todo.txt` via `todo.sh add`:
 
 ```bash
-todo.sh add "(A) Investigate <shortened title> +<project> @<context> plan:~/ai-plans/<YYYY-MM-DD>-<title>.md"
+todo.sh add "(A) Investigate <shortened title> +<project> @<context> plan:~/ai-plans/todos/<YYYY-MM-DD>-<title>.md"
 ```
 
 - Use the priority from `--priority` if given.
@@ -121,7 +122,7 @@ Return a concise summary:
 ```
 ✅ Issue tabled.
 
-Plan:   ~/ai-plans/<YYYY-MM-DD>-<title>.md
+Plan:   ~/ai-plans/todos/<YYYY-MM-DD>-<title>.md
 Todo:   line <NR> in todo.txt
 Title:  <Title>
 Tags:   +<project> @<context>
@@ -143,9 +144,10 @@ plan file:
 
 ## Notes
 
-- The plan file lives in `~/ai-plans/`, which is a git repo. After writing, commit
-  it per the user's plan-doc rules (stage only the touched file).
+- The plan file lives in `~/ai-plans/todos/`, which is inside the `~/ai-plans/`
+  git repo. After writing, commit it per the user's plan-doc rules (stage only the
+  touched file).
 - If `~/ai-plans/` does not exist, create it as a git repo (`git init`) and warn
-  the user.
+  the user. Create `~/ai-plans/todos/` inside it if it does not exist.
 - Keep the todo line short; the full context is in the plan file. The todo is a
   pointer, not a dump.
