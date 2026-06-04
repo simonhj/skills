@@ -62,6 +62,14 @@ For small writes with tiny output (`add`, `do NR`, `pri NR X`, `depri NR`, `repl
 
 Use judgment: a single `todo.sh ls @phone` that's expected to return a couple of lines doesn't need a subagent; a `todo.sh listall` on a long-lived list does.
 
+## Skill Subcommands
+
+When this skill is invoked via `/todotxt <subcommand>`, the following subcommands are recognized:
+
+| Subcommand | Action |
+|---|---|
+| `ls`, `list` | List **all** to-dos sorted by due date (earliest `due:` first; tasks without a due date last), displayed as a table with columns: line number, priority, due date, task text |
+
 ## Common Commands
 
 ### Adding tasks
