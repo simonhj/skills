@@ -1,0 +1,150 @@
+/* html-answer interactive annotator — Tufte-leaning, restrained chrome. */
+
+/* Highlights */
+mark.ha-mark {
+  background: rgba(255, 230, 150, 0.45);
+  border-bottom: 1px solid rgba(180, 140, 30, 0.55);
+  padding: 0;
+  color: inherit;
+}
+mark.ha-mark.ha-pending {
+  background: rgba(255, 230, 150, 0.25);
+  border-bottom: 1px dotted rgba(180, 140, 30, 0.8);
+  animation: ha-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ha-pulse {
+  50% { background: rgba(255, 230, 150, 0.5); }
+}
+
+sup.ha-ref {
+  font-family: Georgia, serif;
+  font-size: 0.7em;
+  color: #8a5a00;
+  cursor: pointer;
+  margin-left: 1px;
+  user-select: none;
+}
+
+/* Ask button */
+.ha-ask-btn {
+  position: absolute;
+  z-index: 9998;
+  font: 600 12px/1 Inter, -apple-system, sans-serif;
+  color: #fff;
+  background: #1a1a1a;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.ha-ask-btn:hover { background: #333; }
+
+/* Question popover */
+.ha-popover {
+  position: absolute;
+  z-index: 9999;
+  width: 320px;
+  background: #fffef9;
+  border: 1px solid #d8d2c4;
+  border-radius: 6px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  padding: 10px;
+}
+.ha-popover-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: 14px/1.4 Georgia, serif;
+  border: 1px solid #d8d2c4;
+  border-radius: 4px;
+  padding: 6px 8px;
+  resize: vertical;
+  background: #fff;
+}
+.ha-popover-input:focus { outline: 1px solid #8a5a00; }
+.ha-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.ha-popover-actions button {
+  font: 600 12px/1 Inter, -apple-system, sans-serif;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border: 1px solid #d8d2c4;
+  background: #fff;
+  color: #444;
+}
+.ha-popover-actions .ha-submit {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+  color: #fff;
+}
+.ha-popover-actions .ha-submit:hover { background: #333; }
+
+/* Margin notes layer */
+.ha-notes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+.ha-note {
+  position: absolute;
+  pointer-events: auto;
+  font: 12.5px/1.45 Georgia, serif;
+  color: #3a3a3a;
+  border-left: 2px solid rgba(180, 140, 30, 0.55);
+  padding: 2px 0 2px 10px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ha-note.ha-note-active {
+  border-left-color: #8a5a00;
+  background: rgba(255, 230, 150, 0.18);
+}
+.ha-note-pending { opacity: 0.75; }
+
+/* Inline fallback (narrow screens) */
+.ha-inline-note {
+  font: 13px/1.5 Georgia, serif;
+  color: #3a3a3a;
+  border-left: 2px solid rgba(180, 140, 30, 0.55);
+  background: rgba(255, 230, 150, 0.12);
+  padding: 8px 12px;
+  margin: 10px 0;
+}
+
+/* Shared note content */
+.ha-q {
+  font-style: italic;
+  color: #6b6353;
+  margin-bottom: 4px;
+}
+.ha-q::before { content: "Q: "; font-style: normal; font-weight: 600; }
+.ha-a p { margin: 0 0 6px; }
+.ha-a p:last-child { margin-bottom: 0; }
+.ha-a code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 3px;
+  border-radius: 3px;
+}
+.ha-waiting {
+  color: #8a8071;
+  font-style: italic;
+}
+.ha-waiting::after {
+  content: "";
+  animation: ha-dots 1.5s steps(4, end) infinite;
+}
+@keyframes ha-dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}

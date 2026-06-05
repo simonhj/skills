@@ -18,6 +18,19 @@ Especially use it when the answer contains diagrams, code, architecture,
 workflows, relationships between contexts, timelines, tradeoff analysis, or
 multi-section educational material.
 
+## Modes
+
+- **Static mode (default)**: generate the HTML file and open it directly, per
+  the instructions below.
+- **Interactive mode**: use when the user asks for interactive mode or says
+  they want to ask follow-up questions inside the page. The HTML is generated
+  exactly the same way, but served by the bundled Next.js server
+  (`scripts/server/`): the reader highlights text, clicks "Ask AI", and types
+  a question; this Claude session answers it and the answer appears as a
+  Tufte margin note anchored to the highlight. Before starting, read
+  `references/INTERACTIVE.md` for the full protocol (server lifecycle, waiter
+  loop, answering guidance).
+
 ## Instructions
 
 1. Create a standalone `.html` file in `/tmp` and put the full answer there.
