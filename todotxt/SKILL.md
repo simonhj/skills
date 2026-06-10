@@ -79,7 +79,20 @@ todo.sh add "THING I NEED TO DO +project @context"
 todo.sh a "THING I NEED TO DO +project @context"
 ```
 
-- Use `-t` to automatically prepend today's date: `todo.sh -t add "THING"`
+- Use `-t` to automatically prepend today's date as a **creation date**: `todo.sh -t add "THING"`
+- **Avoid `-t` when the task has a due date but no meaningful creation date** — the creation date clutters the display. Use plain `todo.sh add` instead.
+
+### Setting due dates
+
+```bash
+todo.sh add "due:2026-06-10 Task description +project @context"
+todo.sh replace NR "due:2026-06-15 Updated task description +project @context"
+```
+
+- Due dates use the `due:YYYY-MM-DD` key-value syntax embedded in the task text.
+- The `list` subcommand sorts by due date (earliest first; tasks without a due date last).
+- **Do NOT use `todo.sh -t add` just to add a due date** — `-t` prepends a creation date (e.g., `2026-06-10`), which is displayed as a separate column from the `due:` date. If you want a due date, use `due:YYYY-MM-DD` in the task text directly.
+- When a user says "do this today" or "what I want to do today", set `due:YYYY-MM-DD` with today's date — do NOT use `-t`.
 
 ### Listing tasks
 
@@ -106,6 +119,9 @@ todo.sh p NR B                           # Short alias
 todo.sh depri NR                         # Remove priority
 todo.sh dp NR                            # Short alias
 ```
+
+- **ALWAYS prefer `replace` over `del` + `add`** when editing an existing task. Deleting and re-adding changes the line number, loses provenance metadata, and creates duplicates if the delete fails silently. `replace` preserves the line number and is atomic.
+- When using `replace`, keep the full task text including any `due:`, `+project`, `@context`, and metadata tags — only change the parts that need updating.
 
 ### Completing and deleting
 
