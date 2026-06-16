@@ -118,15 +118,71 @@ sup.ha-ref {
   margin: 10px 0;
 }
 
+/* Orphaned thread — quoted text no longer present after a page update. */
+.ha-inline-note.ha-orphan {
+  border-left-color: #b8860b;
+  background: rgba(255, 210, 120, 0.16);
+}
+.ha-orphan::before {
+  content: "⚠ Highlighted text not found on this version of the page";
+  display: block;
+  font-size: 11px;
+  font-style: italic;
+  color: #a06a00;
+  margin-bottom: 6px;
+}
+
 /* Shared note content */
 .ha-q {
   font-style: italic;
   color: #6b6353;
   margin-bottom: 4px;
 }
+.ha-q + .ha-a { margin-bottom: 8px; }
+.ha-a + .ha-q { margin-top: 8px; padding-top: 8px; border-top: 1px dotted rgba(180, 140, 30, 0.3); }
 .ha-q::before { content: "Q: "; font-style: normal; font-weight: 600; }
 .ha-a p { margin: 0 0 6px; }
 .ha-a p:last-child { margin-bottom: 0; }
+
+/* Follow-up reply affordance */
+.ha-reply-btn {
+  margin-top: 8px;
+  padding: 2px 0;
+  background: none;
+  border: none;
+  font: 600 11px/1 Inter, -apple-system, sans-serif;
+  color: #8a5a00;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.ha-reply-btn:hover { color: #5a3a00; }
+.ha-reply-box { margin-top: 8px; }
+.ha-reply-input {
+  width: 100%;
+  box-sizing: border-box;
+  font: 13px/1.4 Georgia, serif;
+  border: 1px solid #d8d2c4;
+  border-radius: 4px;
+  padding: 5px 7px;
+  resize: vertical;
+  background: #fff;
+}
+.ha-reply-input:focus { outline: 1px solid #8a5a00; }
+.ha-reply-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+.ha-reply-send {
+  font: 600 11px/1 Inter, -apple-system, sans-serif;
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 5px 11px;
+  cursor: pointer;
+}
+.ha-reply-send:hover { background: #333; }
 .ha-a code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.92em;

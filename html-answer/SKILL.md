@@ -27,9 +27,18 @@ multi-section educational material.
   exactly the same way, but served by the bundled Next.js server
   (`scripts/server/`): the reader highlights text, clicks "Ask AI", and types
   a question; this Claude session answers it and the answer appears as a
-  Tufte margin note anchored to the highlight. Before starting, read
-  `references/INTERACTIVE.md` for the full protocol (server lifecycle, waiter
-  loop, answering guidance).
+  Tufte margin note anchored to the highlight. Two capabilities matter here:
+  - **The conversation continues.** Each highlight is a thread — the reader
+    can click "Ask a follow-up" in a note to keep asking about the same
+    passage, and your answers carry the thread's prior turns as context.
+  - **The page can be updated, and comments persist across reloads.** The
+    user can ask you to revise the document; rewrite the same `/tmp` HTML
+    file and have the reader reload. The new content appears and existing
+    comments are re-anchored to their quoted text — reloading never removes
+    them.
+
+  Before starting, read `references/INTERACTIVE.md` for the full protocol
+  (server lifecycle, waiter loop, follow-ups, page-update handling).
 
 ## Instructions
 

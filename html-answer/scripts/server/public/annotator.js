@@ -1,14 +1,20 @@
 // html-answer interactive annotator.
 // Injected by the server into the generated answer document. Lets the reader
-// highlight text, ask a question, and renders the AI's answer as a Tufte
-// margin note (inline-expandable fallback on narrow screens).
+// highlight text, ask a question, continue the conversation with follow-ups,
+// and renders the AI's answers as Tufte margin notes (inline-expandable
+// fallback on narrow screens).
+//
+// Threads are anchored to the document by their quoted text, so they survive a
+// page reload: on load we re-find each stored quote and re-attach its note.
+// This lets the user ask Claude to regenerate/update the HTML file, reload, and
+// keep every existing comment in place.
 (() => {
   "use strict";
 
   const POLL_MS = 1500;
   const MIN_GUTTER = 220; // px of right gutter required for margin notes
 
-  /** id -> { marks: Element[], note: Element, aside: Element, sup: Element|null, status } */
+  /** id -> { marks, note, aside, sup, thread, orphan, lastRender } */
   const anns = new Map();
 
   // ---------------------------------------------------------------- UI shell
@@ -41,7 +47,12 @@
 
   const inOwnUi = (node) => {
     const e = node.nodeType === 1 ? node : node.parentElement;
-    return !!e && !!e.closest(".ha-popover,.ha-ask-btn,.ha-notes-layer,.ha-inline-note");
+    return (
+      !!e &&
+      !!e.closest(
+        ".ha-popover,.ha-ask-btn,.ha-notes-layer,.ha-inline-note,.ha-ref",
+      )
+    );
   };
 
   // ------------------------------------------------------------- selection
@@ -96,6 +107,10 @@
     askBtn.hidden = true;
   }
 
+  function genId() {
+    return `ha-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+
   // ---------------------------------------------------------------- submit
 
   async function submit() {
@@ -105,24 +120,25 @@
     closePopover();
     window.getSelection()?.removeAllRanges();
 
-    const id = `ha-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = genId();
     const quote = range.toString();
     const { prefix, suffix } = surroundingText(range);
     const heading = nearestHeading(range);
     const marks = wrapRange(range, id);
     if (marks.length === 0) return;
 
-    const note = el("aside", "ha-note ha-note-pending");
-    note.dataset.haId = id;
-    layer.appendChild(note);
-    const aside = el("aside", "ha-inline-note");
-    aside.dataset.haId = id;
-    aside.hidden = true;
-    const lastMark = marks[marks.length - 1];
-    blockAncestor(lastMark).insertAdjacentElement("afterend", aside);
-
-    anns.set(id, { marks, note, aside, sup: null, status: "pending" });
-    renderContent(id, question, null);
+    const { note, aside } = buildNoteElements(id, marks);
+    const thread = {
+      id,
+      number: "?",
+      quote,
+      prefix,
+      suffix,
+      heading,
+      exchanges: [{ question, status: "queued" }],
+    };
+    anns.set(id, { marks, note, aside, sup: null, thread, orphan: false, lastRender: "" });
+    renderThread(id);
     wireHover(id);
 
     let number = "?";
@@ -135,19 +151,65 @@
       const data = await res.json();
       if (data.ok) number = String(data.number);
     } catch {
-      renderContent(id, question, "<p><em>Failed to reach the server.</em></p>");
+      thread.exchanges[0].answerHtml = "<p><em>Failed to reach the server.</em></p>";
+      renderThread(id);
     }
 
-    const sup = el("sup", "ha-ref");
-    sup.textContent = number;
-    sup.dataset.haId = id;
-    lastMark.insertAdjacentElement("afterend", sup);
-    anns.get(id).sup = sup;
-    sup.addEventListener("click", () => toggleInline(id));
+    attachRef(id, marks[marks.length - 1], number);
     reposition();
   }
 
+  // -------------------------------------------------------- follow-up turns
+
+  async function sendFollowup(id, text) {
+    const question = text.trim();
+    if (!question) return;
+    const a = anns.get(id);
+    if (a) {
+      // Optimistic: show the question immediately as pending.
+      a.thread.exchanges.push({ question, status: "queued" });
+      renderThread(id);
+      reposition();
+    }
+    try {
+      await fetch("/api/questions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, question }),
+      });
+    } catch {
+      /* poll will reconcile when the server is reachable */
+    }
+    poll();
+  }
+
   // ------------------------------------------------------------- anchoring
+
+  function buildNoteElements(id, marks) {
+    const note = el("aside", "ha-note ha-note-pending");
+    note.dataset.haId = id;
+    layer.appendChild(note);
+    const aside = el("aside", "ha-inline-note");
+    aside.dataset.haId = id;
+    aside.hidden = true;
+    if (marks.length) {
+      blockAncestor(marks[marks.length - 1]).insertAdjacentElement("afterend", aside);
+    }
+    return { note, aside };
+  }
+
+  function attachRef(id, lastMark, number) {
+    const sup = el("sup", "ha-ref");
+    sup.textContent = String(number);
+    sup.dataset.haId = id;
+    lastMark.insertAdjacentElement("afterend", sup);
+    const a = anns.get(id);
+    if (a) {
+      a.sup = sup;
+      a.thread.number = number;
+    }
+    sup.addEventListener("click", () => toggleInline(id));
+  }
 
   function wrapRange(range, id) {
     const root =
@@ -210,14 +272,142 @@
     return best ? best.textContent.trim() : undefined;
   }
 
+  // --------------------------------------------------- re-anchor on reload
+
+  // Build a Range for a stored quote by searching the live document text,
+  // disambiguating between repeated occurrences with the saved prefix/suffix.
+  // This is a text-quote selector: it tolerates the document being regenerated
+  // as long as the quoted passage still exists.
+  function findRange(quote, prefix, suffix) {
+    if (!quote) return null;
+    const main = document.querySelector("main") || document.body;
+    const walker = document.createTreeWalker(main, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) =>
+        inOwnUi(n) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+    });
+    const nodes = [];
+    let text = "";
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      nodes.push({ node: n, start: text.length, len: n.data.length });
+      text += n.data;
+    }
+
+    let best = -1;
+    let bestScore = -1;
+    for (let from = 0; ; ) {
+      const i = text.indexOf(quote, from);
+      if (i === -1) break;
+      const before = text.slice(Math.max(0, i - 40), i);
+      const after = text.slice(i + quote.length, i + quote.length + 40);
+      const score =
+        commonSuffixLen(before, prefix || "") + commonPrefixLen(after, suffix || "");
+      if (score > bestScore) {
+        bestScore = score;
+        best = i;
+      }
+      from = i + 1;
+    }
+    if (best === -1) return null;
+
+    const s = locate(nodes, best);
+    const e = locate(nodes, best + quote.length);
+    if (!s || !e) return null;
+    const range = document.createRange();
+    range.setStart(s.node, s.offset);
+    range.setEnd(e.node, e.offset);
+    return range;
+  }
+
+  function locate(nodes, idx) {
+    for (const e of nodes) {
+      if (idx >= e.start && idx <= e.start + e.len) {
+        return { node: e.node, offset: idx - e.start };
+      }
+    }
+    const last = nodes[nodes.length - 1];
+    return last ? { node: last.node, offset: last.len } : null;
+  }
+
+  function commonSuffixLen(a, b) {
+    let n = 0;
+    while (n < a.length && n < b.length && a[a.length - 1 - n] === b[b.length - 1 - n]) n++;
+    return n;
+  }
+  function commonPrefixLen(a, b) {
+    let n = 0;
+    while (n < a.length && n < b.length && a[n] === b[n]) n++;
+    return n;
+  }
+
+  // Recreate a thread's UI from server state (used on reload, and for threads
+  // created in another browser/tab). Orphaned threads — whose quoted text no
+  // longer exists — are shown as an inline note so the comment is never lost.
+  function anchorThread(t) {
+    const range = findRange(t.quote, t.prefix, t.suffix);
+    const marks = range ? wrapRange(range, t.id) : [];
+    const { note, aside } = buildNoteElements(t.id, marks);
+    const orphan = marks.length === 0;
+    anns.set(t.id, { marks, note, aside, sup: null, thread: t, orphan, lastRender: "" });
+
+    if (orphan) {
+      note.style.display = "none";
+      aside.classList.add("ha-orphan");
+      aside.hidden = false;
+      (document.querySelector("main") || document.body).appendChild(aside);
+    } else {
+      attachRef(t.id, marks[marks.length - 1], t.number);
+      wireHover(t.id);
+    }
+    renderThread(t.id);
+  }
+
   // ------------------------------------------------------------- rendering
 
-  function renderContent(id, question, answerHtml) {
+  function renderThread(id) {
     const a = anns.get(id);
-    const q = `<div class="ha-q">${escapeHtml(question)}</div>`;
-    const body = answerHtml ?? '<div class="ha-waiting">Asking Claude…</div>';
-    a.note.innerHTML = q + `<div class="ha-a">${body}</div>`;
-    a.aside.innerHTML = a.note.innerHTML;
+    if (!a) return;
+    const t = a.thread;
+    const key = JSON.stringify(t.exchanges) + "|" + a.orphan;
+    if (key === a.lastRender) return; // avoid clobbering an open reply box
+    a.lastRender = key;
+
+    let html = "";
+    for (const ex of t.exchanges) {
+      html += `<div class="ha-q">${escapeHtml(ex.question)}</div>`;
+      const body = ex.answerHtml ?? '<div class="ha-waiting">Asking Claude…</div>';
+      html += `<div class="ha-a">${body}</div>`;
+    }
+    html += '<button type="button" class="ha-reply-btn">Ask a follow-up</button>';
+
+    a.note.innerHTML = html;
+    a.aside.innerHTML = html;
+    wireReply(id, a.note);
+    wireReply(id, a.aside);
+
+    const pending = t.exchanges.some((ex) => ex.answerHtml === undefined);
+    a.note.classList.toggle("ha-note-pending", pending);
+    for (const m of a.marks) m.classList.toggle("ha-pending", pending);
+  }
+
+  function wireReply(id, container) {
+    const btn = container.querySelector(".ha-reply-btn");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      const box = el("div", "ha-reply-box");
+      box.innerHTML =
+        '<textarea class="ha-reply-input" rows="2" placeholder="Ask a follow-up…"></textarea>' +
+        '<div class="ha-reply-actions">' +
+        '<button type="button" class="ha-reply-send">Send</button></div>';
+      btn.replaceWith(box);
+      const ta = box.querySelector(".ha-reply-input");
+      ta.focus();
+      ta.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) sendFollowup(id, ta.value);
+      });
+      box.querySelector(".ha-reply-send").addEventListener("click", () =>
+        sendFollowup(id, ta.value),
+      );
+    });
   }
 
   function escapeHtml(s) {
@@ -235,14 +425,15 @@
   }
 
   function toggleInline(id) {
-    if (!document.body.classList.contains("ha-narrow")) return;
     const a = anns.get(id);
+    if (a.orphan) return; // orphan note is always shown inline
+    if (!document.body.classList.contains("ha-narrow")) return;
     a.aside.hidden = !a.aside.hidden;
   }
 
-  // Margin-note layout: absolute positions in document coordinates,
-  // stacked downward to avoid overlap. Falls back to inline mode when the
-  // right gutter is too small.
+  // Margin-note layout: absolute positions in document coordinates, stacked
+  // downward to avoid overlap. Falls back to inline mode when the right gutter
+  // is too small. Orphaned (markless) threads are skipped — they render inline.
   function reposition() {
     const main = document.querySelector("main") || document.body;
     const mainRect = main.getBoundingClientRect();
@@ -255,6 +446,7 @@
     const left = window.scrollX + mainRect.right + 12;
     const width = Math.min(260, gutter - 24);
     const entries = [...anns.values()]
+      .filter((a) => !a.orphan && a.marks.length)
       .map((a) => ({
         a,
         top: a.marks[0].getBoundingClientRect().top + window.scrollY,
@@ -272,26 +464,31 @@
   }
 
   window.addEventListener("resize", reposition);
-  window.addEventListener("load", reposition);
+  window.addEventListener("load", () => {
+    poll(); // re-anchor any threads already stored server-side
+    reposition();
+  });
 
   // --------------------------------------------------------------- polling
 
   async function poll() {
+    let threads;
     try {
       const res = await fetch("/api/questions");
-      const { questions } = await res.json();
-      for (const q of questions) {
-        const a = anns.get(q.id);
-        if (!a || a.status === "answered" || q.status !== "answered") continue;
-        a.status = "answered";
-        renderContent(q.id, q.question, q.answerHtml);
-        for (const m of a.marks) m.classList.remove("ha-pending");
-        a.note.classList.remove("ha-note-pending");
-        reposition();
-      }
+      threads = (await res.json()).threads;
     } catch {
-      /* server briefly unreachable; keep polling */
+      return; // server briefly unreachable; keep polling
     }
+    if (!threads) return;
+    for (const t of threads) {
+      if (!anns.has(t.id)) {
+        anchorThread(t); // reload / cross-tab: rebuild the comment in place
+      } else {
+        anns.get(t.id).thread = t;
+        renderThread(t.id);
+      }
+    }
+    reposition();
   }
 
   setInterval(poll, POLL_MS);
