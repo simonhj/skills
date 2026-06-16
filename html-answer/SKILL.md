@@ -122,6 +122,32 @@ Diagram requirements:
 9. Keep diagrams readable by choosing appropriate Mermaid chart types and
    splitting oversized diagrams when clarity would improve.
 
+### Required: syntax-check every diagram
+
+You **must** validate all Mermaid diagrams with the bundled checker before
+opening the file or finishing your response. A diagram with a syntax error
+renders as a broken red error box, so this is not optional.
+
+`scripts/check-mermaid.mjs` parses each `.mermaid` block with the mermaid
+library (no `mmdc`, no headless browser). First run only, install its two
+dependencies:
+
+```bash
+cd <skill-dir>/scripts && npm install   # installs mermaid + jsdom
+```
+
+Then check the generated file:
+
+```bash
+node <skill-dir>/scripts/check-mermaid.mjs /tmp/<answer>.html
+```
+
+It prints `✓`/`✗` per diagram, shows the parse error and source for failures,
+and exits non-zero if any diagram is invalid. **If it reports a failure, fix
+the diagram and re-run until it exits 0** — do not open the file or report it
+as done with a failing diagram. (Use `--raw <file.mmd>` to check a standalone
+diagram file, or pipe a single diagram via stdin with `-`.)
+
 ## Code Blocks
 
 Use Highlight.js for any code in the answer.
@@ -187,3 +213,7 @@ Use this structure unless the task calls for a different layout:
 6. Add a small script for diagram click-to-zoom when Mermaid diagrams are
    present.
 7. Verify the file exists in `/tmp` before opening it and responding.
+8. If the page contains any Mermaid diagrams, run
+   `node <skill-dir>/scripts/check-mermaid.mjs /tmp/<answer>.html` and confirm
+   it exits 0 before opening the file (see "Required: syntax-check every
+   diagram" above).
