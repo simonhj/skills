@@ -59,23 +59,29 @@ gh pr comment <N> --body "bugbot run
 
 After posting, tell the user the three triggers are out and that you'll watch for reviews. Print the PR URL.
 
-## Step 3 — Watch for reviews
+## Step 3 — Watch for reviews (background)
 
-Poll the PR for new reviews and inline comments. Between polls, return control to the user (do not spin a tight loop). A reasonable cadence: check every few minutes, or whenever the user prompts / the session wakes.
+Run the watch loop as a **background async subagent** so the main session stays free for the user. Use `subagent` with `async: true` and a `workflowScript` that polls the PR on a cadence and surfaces new findings to the session as they arrive.
 
-Each watch pass:
+- Launch one async child whose task is: poll the PR every few minutes, diff against the baseline from Step 1, and `emit` / steer the parent whenever new findings land. The child does **not** fix anything; it only reports.
+- The parent session returns control to the user immediately after launching. Pi wakes the session when the child emits new findings (use `subagent_wait` only if a specific turn must block for results).
+- If a turn must block until the next batch of findings arrives, use `subagent_wait` with a timeout rather than spinning inline.
+
+Each watch pass (inside the background child):
 
 1. Fetch current state:
    ```bash
    gh pr view <N> --json reviews,comments,statusCheckRollup,reviewThreads
    gh api repos/{owner}/{repo}/pulls/{N}/comments   # inline review comments
    ```
-2. **Diff against the baseline** from Step 1. Identify newly-arrived reviews and comments only. Track which you have already triaged (keep a mental/scratch ledger keyed by comment node id or review id).
+2. **Diff against the baseline** from Step 1. Identify newly-arrived reviews and comments only. Track which you have already triaged (keep a scratch ledger keyed by comment node id or review id, persisted in the scratch dir so it survives across passes).
 3. For each **new** finding, classify by author and severity:
    - **Bugbot**: inline comments; severity from the comment. Check `Cursor Bugbot` check status.
    - **Claude**: review summary + inline comments from the `claude-code-action` bot.
    - **Codex**: review with P0/P1 inline comments (Codex only flags P0/P1).
-4. Group findings that share a root cause. Address the highest-severity group first.
+4. Emit the new findings (grouped by root cause, highest severity first) back to the parent session.
+
+The parent (foreground) handles Step 4 for each batch the child reports.
 
 ## Step 4 — Address each finding
 
@@ -88,7 +94,7 @@ For each finding (or group):
 3. **Record the outcome** in your scratch ledger: finding id → `fixed` (commit sha) or `rebutted` (reason).
 4. Move to the next finding.
 
-After a push, the bots may re-scan and post new findings or confirm resolutions. Loop back to Step 3.
+After a push, the bots may re-scan and post new findings or confirm resolutions. The background watcher keeps polling; the parent re-enters Step 4 for each new batch.
 
 ## Step 5 — Done
 
@@ -107,7 +113,7 @@ Report a compact summary: per bot, counts of findings fixed vs. rebutted, and th
 | Finding is a false positive | Rebut on PR with technical reason, record in ledger |
 | Findings share a root cause | One commit for the group |
 | New findings arrive after a push | Re-enter Step 3 watch loop |
-| User says stop | Stop watching, summarize current state |
+| User says stop | Stop the background watcher, summarize current state |
 
 ## Output Contract
 
