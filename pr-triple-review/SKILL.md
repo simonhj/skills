@@ -49,12 +49,12 @@ After confirmation, capture: `PR_NUMBER`, `PR_URL`, `HEAD_REF`, `BASE_REF`, and 
 
 ## Step 2 — Trigger all three reviews
 
-Post the three trigger comments. Run them as separate `gh pr comment` calls (they hit different bots; keeping them separate makes a failed post visible).
+Post a single PR comment containing all three trigger phrases, one per line. Each bot scans comments for its own phrase, so one comment triggers all three.
 
 ```bash
-gh pr comment <N> --body "bugbot run"
-gh pr comment <N> --body "@claude review once"
-gh pr comment <N> --body "@codex review"
+gh pr comment <N> --body "bugbot run
+@claude review once
+@codex review"
 ```
 
 After posting, tell the user the three triggers are out and that you'll watch for reviews. Print the PR URL.
@@ -103,7 +103,7 @@ Report a compact summary: per bot, counts of findings fixed vs. rebutted, and th
 | Situation | Action |
 |-----------|--------|
 | No PR in conversation context | Ask user for PR number/URL, stop and wait |
-| A bot doesn't react to its trigger | Tell user it's likely not installed; share setup link; keep watching the others |
+| A bot doesn't react to the combined comment | Tell user it's likely not installed; share setup link; keep watching the others. If two react but one doesn't, do not repost that one's phrase as a standalone comment unless the user asks |
 | Finding is a false positive | Rebut on PR with technical reason, record in ledger |
 | Findings share a root cause | One commit for the group |
 | New findings arrive after a push | Re-enter Step 3 watch loop |
